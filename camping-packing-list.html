@@ -460,10 +460,18 @@ const LS_DATA = "packing-" + LIST_ID + "-data";
 let state = {};
 let data = JSON.parse(JSON.stringify(DEFAULT_DATA));
 let editMode = false;
-let supabase = null;
 let syncReady = false;
 let writeTimer = null;
-let ignoreNextRemote = false;
+let pollTimer = null;
+let lastUpdated = null;
+
+const API_BASE = SUPABASE_URL + "/rest/v1/" + TABLE;
+const HEADERS = {
+  "apikey": SUPABASE_ANON_KEY,
+  "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+  "Content-Type": "application/json",
+  "Prefer": "return=representation"
+};
 
 function loadLocal() {
   try { state = JSON.parse(localStorage.getItem(LS_STATE)) || {}; } catch { state = {}; }
@@ -486,74 +494,76 @@ function setSyncStatus(text, cls) {
 
 async function initSync() {
   try {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const res = await fetch(API_BASE + "?id=eq." + encodeURIComponent(LIST_ID) + "&select=*", {
+      headers: HEADERS
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status + ": " + (await res.text()));
+    const rows = await res.json();
 
-    const { data: row, error } = await supabase
-      .from(TABLE)
-      .select("*")
-      .eq("id", LIST_ID)
-      .maybeSingle();
-
-    if (error) throw error;
-
-    if (row) {
-      if (row.state) state = row.state;
-      if (row.data) data = row.data;
+    if (rows.length > 0) {
+      const row = rows[0];
+      if (row.state && Object.keys(row.state).length) state = row.state;
+      if (row.data && row.data.length) data = row.data;
+      lastUpdated = row.updated_at;
       saveLocal();
     } else {
-      await supabase.from(TABLE).insert({
-        id: LIST_ID,
-        state: state,
-        data: data,
-        updated_at: new Date().toISOString()
+      const now = new Date().toISOString();
+      const insertRes = await fetch(API_BASE, {
+        method: "POST",
+        headers: HEADERS,
+        body: JSON.stringify({ id: LIST_ID, state: state, data: data, updated_at: now })
       });
+      if (!insertRes.ok) throw new Error("Insert failed: " + (await insertRes.text()));
+      lastUpdated = now;
     }
 
-    supabase
-      .channel("packing-" + LIST_ID)
-      .on("postgres_changes", {
-        event: "UPDATE",
-        schema: "public",
-        table: TABLE,
-        filter: "id=eq." + LIST_ID
-      }, (payload) => {
-        if (ignoreNextRemote) { ignoreNextRemote = false; return; }
-        const row = payload.new;
-        if (row.state) state = row.state;
-        if (row.data) data = row.data;
-        saveLocal();
-        render();
-      })
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          syncReady = true;
-          setSyncStatus("Synced", "connected");
-        }
-      });
-
+    syncReady = true;
+    setSyncStatus("Synced", "connected");
     render();
+    startPolling();
   } catch (e) {
-    console.warn("Sync unavailable, using local storage:", e);
-    setSyncStatus("Offline — " + (e.message || e.code || JSON.stringify(e)), "offline");
+    console.warn("Sync unavailable:", e);
+    setSyncStatus("Offline — " + (e.message || "unknown error"), "offline");
     render();
   }
 }
 
+function startPolling() {
+  if (pollTimer) return;
+  pollTimer = setInterval(async () => {
+    try {
+      const res = await fetch(API_BASE + "?id=eq." + encodeURIComponent(LIST_ID) + "&select=*", {
+        headers: HEADERS
+      });
+      if (!res.ok) return;
+      const rows = await res.json();
+      if (rows.length === 0) return;
+      const row = rows[0];
+      if (row.updated_at && row.updated_at !== lastUpdated) {
+        lastUpdated = row.updated_at;
+        if (row.state) state = row.state;
+        if (row.data && row.data.length) data = row.data;
+        saveLocal();
+        render();
+      }
+    } catch {}
+  }, 3000);
+}
+
 function pushToRemote() {
-  if (!supabase || !syncReady) return;
+  if (!syncReady) return;
   clearTimeout(writeTimer);
   writeTimer = setTimeout(async () => {
-    ignoreNextRemote = true;
+    const now = new Date().toISOString();
+    lastUpdated = now;
     try {
-      await supabase.from(TABLE).upsert({
-        id: LIST_ID,
-        state: state,
-        data: data,
-        updated_at: new Date().toISOString()
+      await fetch(API_BASE + "?id=eq." + encodeURIComponent(LIST_ID), {
+        method: "PATCH",
+        headers: HEADERS,
+        body: JSON.stringify({ state: state, data: data, updated_at: now })
       });
     } catch (e) {
       console.warn("Sync write failed:", e);
-      ignoreNextRemote = false;
     }
   }, 300);
 }
@@ -703,12 +713,7 @@ function showToast(msg) {
 
 loadLocal();
 render();
-
-const script = document.createElement("script");
-script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
-script.onload = () => initSync();
-script.onerror = () => setSyncStatus("Offline — local only", "offline");
-document.head.appendChild(script);
+initSync();
 </script>
 </body>
 </html>
