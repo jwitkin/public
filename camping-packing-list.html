@@ -220,6 +220,75 @@
   }
   .edit-controls button:hover { background: #f3f4f6; }
   .edit-controls button.del:hover { color: var(--orange); }
+  .edit-controls button.edit-name-btn:hover { color: var(--green); }
+
+  .star-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.25rem;
+    line-height: 1;
+    padding: 0 4px;
+    color: #d1d5db;
+    flex-shrink: 0;
+    min-width: 36px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+  }
+  .star-btn:hover { color: #f59e0b; }
+  .star-btn.active { color: #f59e0b; }
+  /* When edit controls are visible, star sits before them (no auto margin needed). */
+  .editing .star-btn { margin-left: 0.25rem; }
+
+  /* Inline item-name editing */
+  .editing-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+  .edit-name {
+    flex: 1;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    min-height: 44px;
+  }
+  .edit-name:focus { outline: 2px solid var(--green); border-color: var(--green); }
+  .editing-item button {
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    min-height: 44px;
+    flex-shrink: 0;
+  }
+  .editing-item .save-edit {
+    border: 1px solid var(--green);
+    background: var(--green);
+    color: #fff;
+  }
+  .editing-item .cancel-edit {
+    border: 1px solid var(--border);
+    background: #fff;
+    color: #374151;
+  }
+
+  /* Priorities (starred) section */
+  .priorities {
+    border-color: #fcd34d;
+    background: #fffbeb;
+  }
+  .priorities .category-header { background: #fffbeb; }
+  .priorities .category-header:hover { background: #fef3c7; }
+  .priorities .category-header h2 { color: #92400e; }
+  .priorities .item:hover { background: #fef9ed; }
+  .pri-cat { opacity: 0.85; }
 
   .add-item {
     display: none;
@@ -485,6 +554,7 @@ const LS_DATA = "packing-" + LIST_ID + "-data";
 let state = {};
 let data = JSON.parse(JSON.stringify(DEFAULT_DATA));
 let editingCats = new Set();
+let editingItem = null;
 let syncReady = false;
 let writeTimer = null;
 let pollTimer = null;
@@ -593,13 +663,79 @@ function pushToRemote() {
   }, 300);
 }
 
+const TAG_LABEL = { toddler: "3.5y", baby: "15mo", hot: "hot tip", prep: "prep?" };
+const TAG_CLASS = { toddler: "tag-toddler", baby: "tag-baby", hot: "tag-hot", prep: "tag-prep" };
+
+function escAttr(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+// Builds the HTML for a single item row.
+// opts: { editable, showCat, idPrefix }
+function itemRowHtml(item, ci, ii, opts) {
+  opts = opts || {};
+  const key = "item_" + ci + "_" + ii;
+  const domId = (opts.idPrefix || "") + key;
+  const isChecked = !!state[key];
+  const starred = !!item.star;
+
+  if (opts.editable && editingItem === ci + "_" + ii) {
+    return '<div class="item editing-item">' +
+      '<input class="edit-name" type="text" value="' + escAttr(item.name) + '" ' +
+        'onkeydown="if(event.key===\'Enter\')saveItemEdit(' + ci + ',' + ii + ',this.value);' +
+        'else if(event.key===\'Escape\')cancelEditItem()">' +
+      '<button class="save-edit" onclick="saveItemEdit(' + ci + ',' + ii + ',this.previousElementSibling.value)">Save</button>' +
+      '<button class="cancel-edit" onclick="cancelEditItem()">Cancel</button>' +
+      '</div>';
+  }
+
+  const tags = (item.tags || []).map(t =>
+    '<span class="tag ' + (TAG_CLASS[t] || "") + '">' + (TAG_LABEL[t] || t) + '</span>'
+  ).join("");
+  const note = item.note ? '<span class="note">' + item.note + '</span>' : "";
+  const prefix = opts.showCat ? '<span class="pri-cat">' + data[ci].icon + ' </span>' : "";
+  const starBtn = '<button class="star-btn' + (starred ? " active" : "") + '" ' +
+    'onclick="toggleStar(' + ci + ',' + ii + ')" title="' +
+    (starred ? "Remove from priorities" : "Mark as priority") + '">' + (starred ? "★" : "☆") + '</button>';
+  const editCtrl = opts.editable ? '<span class="edit-controls">' +
+    '<button class="edit-name-btn" onclick="startEditItem(' + ci + ',' + ii + ')" title="Edit name">&#9998;</button>' +
+    '<button class="del" onclick="deleteItem(' + ci + ',' + ii + ')" title="Delete">&times;</button>' +
+    '</span>' : "";
+
+  return '<div class="item ' + (isChecked ? "checked " : "") + (starred ? "starred" : "") + '">' +
+    '<input type="checkbox" id="' + domId + '" ' + (isChecked ? "checked" : "") + ' onchange="toggle(\'' + key + '\')">' +
+    '<label for="' + domId + '">' + prefix + item.name + tags + note + '</label>' +
+    starBtn +
+    editCtrl +
+    '</div>';
+}
+
 function render() {
   const main = document.getElementById("list");
   main.innerHTML = "";
   let total = 0, checked = 0;
 
-  const tagLabel = { toddler: "3.5y", baby: "15mo", hot: "hot tip", prep: "prep?" };
-  const tagClass = { toddler: "tag-toddler", baby: "tag-baby", hot: "tag-hot", prep: "tag-prep" };
+  // Priorities section — pinned at top, shows starred items across all categories.
+  const starredItems = [];
+  data.forEach((cat, ci) => cat.items.forEach((item, ii) => {
+    if (item.star) starredItems.push({ ci: ci, ii: ii, item: item });
+  }));
+  if (starredItems.length) {
+    const pCollapsed = state["priorities_collapsed"];
+    const pDone = starredItems.filter(s => state["item_" + s.ci + "_" + s.ii]).length;
+    const pDiv = document.createElement("div");
+    pDiv.className = "category priorities" + (pCollapsed ? " collapsed" : "");
+    const pItems = starredItems.map(s =>
+      itemRowHtml(s.item, s.ci, s.ii, { showCat: true, idPrefix: "pri_" })
+    ).join("");
+    pDiv.innerHTML =
+      '<div class="category-header" onclick="togglePriorities()">' +
+        '<h2>⭐ Priorities <span class="count">' + pDone + '/' + starredItems.length + '</span></h2>' +
+        '<span class="category-header-right"><span class="chevron">&#9660;</span></span>' +
+      '</div>' +
+      '<div class="category-items">' + pItems + '</div>';
+    main.appendChild(pDiv);
+  }
 
   data.forEach((cat, ci) => {
     const collapsed = state["cat_" + ci + "_collapsed"];
@@ -608,22 +744,10 @@ function render() {
 
     let catChecked = 0;
     const itemsHtml = cat.items.map((item, ii) => {
-      const key = "item_" + ci + "_" + ii;
-      const isChecked = !!state[key];
+      const isChecked = !!state["item_" + ci + "_" + ii];
       if (isChecked) { catChecked++; checked++; }
       total++;
-      const tags = (item.tags || []).map(t =>
-        '<span class="tag ' + (tagClass[t] || "") + '">' + (tagLabel[t] || t) + '</span>'
-      ).join("");
-      const note = item.note ? '<span class="note">' + item.note + '</span>' : "";
-      const editCtrl = '<span class="edit-controls">' +
-        '<button class="del" onclick="deleteItem(' + ci + ',' + ii + ')" title="Delete">&times;</button>' +
-        '</span>';
-      return '<div class="item ' + (isChecked ? "checked" : "") + '">' +
-        '<input type="checkbox" id="' + key + '" ' + (isChecked ? "checked" : "") + ' onchange="toggle(\'' + key + '\')">' +
-        '<label for="' + key + '">' + item.name + tags + note + '</label>' +
-        editCtrl +
-        '</div>';
+      return itemRowHtml(item, ci, ii, { editable: editingCats.has(ci) });
     }).join("");
 
     const addRow = '<div class="add-item">' +
@@ -698,6 +822,7 @@ function updateEditBtn() {
 }
 
 function toggleEditMode() {
+  editingItem = null;
   if (allEditing()) {
     editingCats.clear();
   } else {
@@ -707,8 +832,44 @@ function toggleEditMode() {
 }
 
 function toggleCatEdit(ci) {
+  editingItem = null;
   if (editingCats.has(ci)) editingCats.delete(ci);
   else editingCats.add(ci);
+  render();
+}
+
+function togglePriorities() {
+  state["priorities_collapsed"] = !state["priorities_collapsed"];
+  saveLocal();
+  pushToRemote();
+  render();
+}
+
+function toggleStar(ci, ii) {
+  data[ci].items[ii].star = !data[ci].items[ii].star;
+  saveLocal();
+  pushToRemote();
+  render();
+}
+
+function startEditItem(ci, ii) {
+  editingItem = ci + "_" + ii;
+  render();
+  const input = document.querySelector(".editing-item .edit-name");
+  if (input) { input.focus(); input.select(); }
+}
+
+function cancelEditItem() {
+  editingItem = null;
+  render();
+}
+
+function saveItemEdit(ci, ii, value) {
+  const name = value.trim();
+  if (name) data[ci].items[ii].name = name;
+  editingItem = null;
+  saveLocal();
+  pushToRemote();
   render();
 }
 
