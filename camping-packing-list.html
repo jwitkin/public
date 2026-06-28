@@ -534,7 +534,7 @@ async function initSync() {
     render();
   } catch (e) {
     console.warn("Sync unavailable, using local storage:", e);
-    setSyncStatus("Offline — local only", "offline");
+    setSyncStatus("Offline — " + (e.message || e.code || JSON.stringify(e)), "offline");
     render();
   }
 }
