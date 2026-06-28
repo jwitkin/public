@@ -698,7 +698,7 @@ function itemRowHtml(item, ci, ii, opts) {
     'onclick="toggleStar(' + ci + ',' + ii + ')" title="' +
     (starred ? "Remove from priorities" : "Mark as priority") + '">' + (starred ? "★" : "☆") + '</button>';
   const editCtrl = opts.editable ? '<span class="edit-controls">' +
-    '<button class="edit-name-btn" onclick="startEditItem(' + ci + ',' + ii + ')" title="Edit name">&#9998;</button>' +
+    '<button class="edit-name-btn" onclick="startEditItem(' + ci + ',' + ii + ')" title="Edit name">&#9998;&#65039;</button>' +
     '<button class="del" onclick="deleteItem(' + ci + ',' + ii + ')" title="Delete">&times;</button>' +
     '</span>' : "";
 
