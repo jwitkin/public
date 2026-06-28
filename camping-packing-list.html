@@ -10,7 +10,6 @@
     --green-light: #d8f3dc;
     --green-bg: #f0faf3;
     --orange: #e76f51;
-    --sand: #fefae0;
     --gray: #6b7280;
     --border: #e5e7eb;
   }
@@ -29,15 +28,8 @@
     padding: 1.5rem 1rem;
     margin-bottom: 1rem;
   }
-  header h1 {
-    font-size: 1.6rem;
-    color: var(--green);
-  }
-  header p {
-    color: var(--gray);
-    font-size: 0.9rem;
-    margin-top: 0.25rem;
-  }
+  header h1 { font-size: 1.6rem; color: var(--green); }
+  header p { color: var(--gray); font-size: 0.9rem; margin-top: 0.25rem; }
   .progress-bar {
     background: var(--border);
     border-radius: 999px;
@@ -72,11 +64,6 @@
     cursor: pointer;
     user-select: none;
     background: #fff;
-    border: none;
-    width: 100%;
-    font: inherit;
-    color: inherit;
-    text-align: left;
   }
   .category-header:hover { background: #fafafa; }
   .category-header h2 {
@@ -141,6 +128,7 @@
   .tag-toddler { background: #dbeafe; color: #1e40af; }
   .tag-baby { background: #fce7f3; color: #9d174d; }
   .tag-hot { background: #fef3c7; color: #92400e; }
+  .tag-prep { background: #e0e7ff; color: #3730a3; }
 
   .actions {
     display: flex;
@@ -160,6 +148,65 @@
   }
   .actions button:hover { background: #f3f4f6; }
   .actions button.danger { color: var(--orange); }
+  .actions button.active {
+    background: var(--green);
+    color: #fff;
+    border-color: var(--green);
+  }
+
+  .edit-controls {
+    display: none;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .editing .edit-controls { display: flex; }
+  .edit-controls button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+    color: var(--gray);
+    line-height: 1;
+  }
+  .edit-controls button:hover { background: #f3f4f6; }
+  .edit-controls button.del:hover { color: var(--orange); }
+
+  .add-item {
+    display: none;
+    padding: 0.4rem 0.5rem;
+  }
+  .editing .add-item { display: flex; }
+  .add-item input {
+    flex: 1;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-family: inherit;
+  }
+  .add-item button {
+    padding: 0.3rem 0.75rem;
+    border: 1px solid var(--green);
+    background: var(--green);
+    color: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    margin-left: 0.5rem;
+  }
+
+  .item-text-edit {
+    flex: 1;
+    padding: 0.2rem 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-family: inherit;
+  }
 
   footer {
     text-align: center;
@@ -173,7 +220,7 @@
 
 <header>
   <h1>Henry Coe Camping Trip</h1>
-  <p>2 nights &middot; July 2026 &middot; with kids (3.5y &amp; 15mo)</p>
+  <p>2 nights &middot; July 2026 &middot; with Jahan (3.5y) &amp; baby (15mo)</p>
   <div class="progress-bar"><div class="progress-bar-fill" id="progressFill"></div></div>
   <div class="progress-text" id="progressText">0 / 0 packed</div>
 </header>
@@ -181,152 +228,191 @@
 <main id="list"></main>
 
 <div class="actions">
+  <button onclick="toggleEditMode()" id="editBtn">Edit List</button>
   <button onclick="expandAll()">Expand All</button>
   <button onclick="collapseAll()">Collapse All</button>
-  <button class="danger" onclick="resetAll()">Reset All</button>
+  <button class="danger" onclick="resetAll()">Reset Checks</button>
 </div>
 
 <footer>Check items as you pack. Progress saves in your browser.</footer>
 
 <script>
-const DATA = [
+const DEFAULT_DATA = [
+  { cat: "Before Leaving", icon: "\u{1F4CB}", items: [
+    { name: "Download offline directions + trail maps", note: "no cell service at Henry Coe" },
+    { name: "Buy groceries (see Meal Plan & Groceries)" },
+    { name: "Prep food — see items marked 'prep at home'" },
+    { name: "Replace headlamp batteries" },
+    { name: "Check fire restrictions", note: "likely active — no campfires in summer" },
+    { name: "Fill water jugs (5 gal)", note: "no potable water at HQ" },
+    { name: "Charge battery packs" },
+    { name: "Pack car" },
+  ]},
   { cat: "Shelter & Sleep", icon: "⛺", items: [
     { name: "Tent + footprint", note: "set up in yard night before to check" },
     { name: "Sleeping bags x2 (adult)" },
-    { name: "Toddler sleeping bag or blanket", tags: ["toddler"] },
-    { name: "Baby sleep sack", tags: ["baby"] },
     { name: "Sleeping pads x2" },
     { name: "Pillows" },
-    { name: "Pack-n-Play or travel crib", tags: ["baby"], note: "for 15mo to sleep in tent" },
-    { name: "Fitted crib sheet", tags: ["baby"] },
-    { name: "Extra blankets (gets cold at night)", note: "Henry Coe nights can drop to 50s" },
+    { name: "Pack-n-Play", tags: ["baby"] },
+    { name: "Pack-n-Play sheet", tags: ["baby"] },
+    { name: "Slumberpod", tags: ["baby"], note: "if using" },
+    { name: "Sleep sack x2", tags: ["baby"] },
+    { name: "Extra blankets", note: "nights can drop to 50s — Jahan will need these" },
+    { name: "Mat / ground cover" },
   ]},
   { cat: "Clothing — Adults", icon: "👕", items: [
     { name: "T-shirts / tanks (3 each)" },
     { name: "Shorts (2 each)" },
     { name: "Long pants (1 each)", note: "for evening / brush" },
-    { name: "Warm layer — fleece or hoodie (1 each)" },
+    { name: "Fleece or hoodie (1 each)" },
     { name: "Underwear & socks (3 each)" },
-    { name: "Sleepwear" },
-    { name: "Sturdy shoes / hiking boots" },
+    { name: "PJs" },
+    { name: "Hiking shoes" },
     { name: "Sandals / camp shoes" },
     { name: "Sun hats" },
-    { name: "Swimsuit", note: "if visiting swimming holes" },
+    { name: "Sunglasses" },
+    { name: "Contacts" },
+    { name: "Sports bra" },
+    { name: "Hair ties / comb" },
   ]},
   { cat: "Clothing — Kids", icon: "🧒", items: [
     { name: "T-shirts (4 each)", tags: ["toddler", "baby"], note: "extras for mess" },
     { name: "Shorts / pants (3 each)", tags: ["toddler", "baby"] },
     { name: "Long sleeves (2 each)", tags: ["toddler", "baby"] },
-    { name: "Warm jacket / fleece (1 each)", tags: ["toddler", "baby"] },
-    { name: "Pajamas (2 sets each)", tags: ["toddler", "baby"] },
+    { name: "Warm jacket / fleece", tags: ["toddler", "baby"] },
+    { name: "Sweatshirt", tags: ["toddler", "baby"] },
+    { name: "PJs (2 sets each)", tags: ["toddler", "baby"] },
     { name: "Socks (4 pairs each)", tags: ["toddler", "baby"] },
-    { name: "Shoes — closed-toe", tags: ["toddler"] },
-    { name: "Shoes / soft-sole boots", tags: ["baby"] },
+    { name: "Closed-toe shoes", tags: ["toddler"] },
+    { name: "Soft-sole shoes", tags: ["baby"] },
     { name: "Sun hats", tags: ["toddler", "baby"] },
-    { name: "Swim diapers", tags: ["baby"] },
   ]},
   { cat: "Diapers & Potty", icon: "🚼", items: [
-    { name: "Diapers — pack 12/day for 15mo", tags: ["baby"], note: "~36 total" },
-    { name: "Pull-ups or diapers for 3.5yo if needed", tags: ["toddler"], note: "nighttime?" },
+    { name: "Diapers (~15)", tags: ["baby"] },
+    { name: "Pull-ups for nighttime", tags: ["toddler"] },
     { name: "Wipes (2 packs)" },
     { name: "Diaper cream" },
     { name: "Portable changing pad" },
     { name: "Trash bags for dirty diapers" },
-    { name: "Travel potty seat or portable potty", tags: ["toddler"] },
+    { name: "Portable potty", tags: ["toddler"] },
   ]},
-  { cat: "Feeding — Baby & Toddler", icon: "🍼", items: [
-    { name: "Bottles / sippy cups", tags: ["baby"] },
-    { name: "Formula or milk + cooler", tags: ["baby"], note: "if applicable" },
-    { name: "Baby food / pouches", tags: ["baby"] },
-    { name: "Toddler snacks — crackers, fruit, bars", tags: ["toddler"] },
-    { name: "Bibs (3+)", tags: ["baby"] },
-    { name: "Spoons / toddler utensils", tags: ["toddler", "baby"] },
+  { cat: "Feeding — Kids", icon: "🍼", items: [
+    { name: "Sippy cups / water cups", tags: ["toddler", "baby"] },
+    { name: "Pouches", tags: ["baby"] },
+    { name: "Bibs", tags: ["baby"] },
+    { name: "Spoons / kid utensils", tags: ["toddler", "baby"] },
     { name: "Plates / bowls — kid-size", tags: ["toddler", "baby"] },
-    { name: "High chair clip-on or booster", tags: ["baby"], note: "if picnic tables at site" },
+    { name: "Lunchbox", tags: ["toddler"] },
+    { name: "Babyganics wipes" },
     { name: "Toddler water bottle", tags: ["toddler"] },
   ]},
-  { cat: "Kitchen & Food — Adults", icon: "🍳", items: [
+  { cat: "Kitchen Gear", icon: "🍳", items: [
     { name: "Camp stove + fuel" },
-    { name: "Lighter / matches" },
-    { name: "Cooler + ice" },
-    { name: "Water jugs (5 gal)", note: "no potable water at Henry Coe car camp" },
-    { name: "Pots & pan" },
-    { name: "Cooking utensils — spatula, tongs, knife" },
+    { name: "Lighter" },
+    { name: "Skillet" },
+    { name: "Pot" },
+    { name: "Spatula" },
+    { name: "Mixing spoon" },
     { name: "Cutting board" },
-    { name: "Plates, bowls, cups, utensils (adult)" },
-    { name: "Coffee setup", note: "French press / pour over / instant" },
+    { name: "Knives" },
+    { name: "Plates, cutlery, cups (adult)" },
     { name: "Mugs" },
-    { name: "Dish soap, sponge, basin" },
+    { name: "Coffee setup", note: "French press / pour-over / instant" },
     { name: "Paper towels" },
-    { name: "Aluminum foil & zip-lock bags" },
+    { name: "Dish soap + sponge" },
     { name: "Trash bags" },
-    { name: "Food — plan meals: 2 breakfasts, 2 lunches, 2 dinners, snacks" },
-    { name: "Bear canister or bear box check", note: "required in some Henry Coe areas" },
+    { name: "Aluminum foil + zip-lock bags" },
+    { name: "Cooler + ice" },
+    { name: "Water jugs (5 gal)", note: "no potable water at HQ" },
+    { name: "Camelbak" },
+  ]},
+  { cat: "Meal Plan & Groceries", icon: "🛒", items: [
+    { name: "— DAY 1 LUNCH: Sandwiches on arrival", tags: ["prep"], note: "prep at home?" },
+    { name: "— DAY 1 DINNER: Burgers + mac n cheese" },
+    { name: "— DAY 2 BREAKFAST: Egg & cheese + bananas + cereal" },
+    { name: "— DAY 2 LUNCH: PB&J + fruit", tags: ["prep"], note: "prep at home?" },
+    { name: "— DAY 2 DINNER: TBD", note: "decide and add ingredients" },
+    { name: "— DAY 3 BREAKFAST: Cereal + fruit + bars (pack-up day)" },
+    { name: "Burger patties", tags: ["prep"], note: "form at home?" },
+    { name: "Burger buns" },
+    { name: "Sliced cheese" },
+    { name: "Eggs" },
+    { name: "Avocado", tags: ["prep"], note: "pre-slice at home?" },
+    { name: "Ketchup" },
+    { name: "Butter" },
+    { name: "Cereal" },
+    { name: "Energy bars" },
+    { name: "Goldfish" },
+    { name: "Graham crackers" },
+    { name: "Chocolate" },
+    { name: "Peanut butter" },
+    { name: "Bread" },
+    { name: "Jam" },
+    { name: "Blueberries" },
+    { name: "Bananas" },
+    { name: "Olive oil spray" },
+    { name: "Salt / pepper / chilli flakes" },
+    { name: "Mac n cheese (boxed)" },
+    { name: "Coffee" },
   ]},
   { cat: "Safety & Health", icon: "🩹", items: [
-    { name: "Sunscreen — adult & baby/kid-safe", tags: ["hot"] },
-    { name: "Insect repellent — kid-safe" },
+    { name: "Sunscreen — adult & kid-safe", tags: ["hot"] },
+    { name: "Bug spray — kid-safe" },
     { name: "First aid kit" },
-    { name: "Children's Tylenol / Motrin", tags: ["toddler", "baby"] },
+    { name: "Children’s Tylenol / Motrin", tags: ["toddler", "baby"] },
     { name: "Thermometer" },
-    { name: "Antihistamine (Benadryl) — kid-dose", tags: ["toddler", "baby"] },
+    { name: "Benadryl — kid dose", tags: ["toddler", "baby"] },
     { name: "Hydrocortisone cream" },
     { name: "Band-aids & gauze" },
-    { name: "Tweezers (ticks & splinters)", note: "Henry Coe is tick country!" },
-    { name: "Tick removal tool", tags: ["hot"], note: "bring a tick key" },
+    { name: "Tweezers", note: "Henry Coe is tick country!" },
+    { name: "Tick removal tool", note: "bring a tick key" },
     { name: "Hand sanitizer" },
     { name: "Any prescription meds" },
   ]},
   { cat: "Gear & Tools", icon: "🔦", items: [
-    { name: "Headlamps / flashlights + batteries" },
-    { name: "Camp chairs (2 adult)" },
-    { name: "Small kid chair or blanket to sit on", tags: ["toddler"] },
-    { name: "Table cloth or cover for picnic table" },
-    { name: "Tarp for shade", tags: ["hot"], note: "Henry Coe gets HOT — plan shade" },
-    { name: "Canopy / pop-up shade", tags: ["hot"] },
+    { name: "Headlamps x2 + batteries" },
+    { name: "Lanterns" },
+    { name: "Chairs x3 (2 adult + 1 kid)" },
+    { name: "Picnic blanket / mat" },
+    { name: "Tablecloth for picnic table" },
+    { name: "Tarp or canopy for shade", tags: ["hot"], note: "Henry Coe gets HOT" },
     { name: "Multi-tool / knife" },
     { name: "Duct tape" },
     { name: "Rope / paracord" },
-    { name: "Firewood / fire starters", note: "check if fires allowed — summer fire ban?" },
-    { name: "Marshmallow roasting sticks" },
   ]},
-  { cat: "Kids Entertainment & Comfort", icon: "🧸", items: [
-    { name: "Favorite stuffed animal / lovey", tags: ["toddler", "baby"] },
-    { name: "Books (2-3)", tags: ["toddler"] },
+  { cat: "Kids Entertainment", icon: "🧸", items: [
+    { name: "Stuffed animals / loveys", tags: ["toddler", "baby"] },
+    { name: "Books (2–3)", tags: ["toddler"] },
     { name: "Bubbles", tags: ["toddler"] },
-    { name: "Sand/dirt toys — bucket, shovel", tags: ["toddler"] },
-    { name: "Ball", tags: ["toddler"] },
-    { name: "Stroller — jogging or all-terrain", tags: ["baby"] },
+    { name: "Jahan’s flashlight / torch", tags: ["toddler"] },
+    { name: "Stroller", tags: ["baby"] },
     { name: "Baby carrier (structured)", tags: ["baby"], note: "for trails" },
-    { name: "Pacifiers (if used)", tags: ["baby"] },
+    { name: "Pacifiers", tags: ["baby"], note: "if used" },
     { name: "White noise machine", tags: ["baby"], note: "battery-powered" },
-    { name: "Glow sticks — fun & helps locate kids at dusk", tags: ["toddler"] },
+    { name: "Glow sticks", tags: ["toddler"], note: "fun + helps spot kids at dusk" },
   ]},
-  { cat: "Hygiene & Bath", icon: "🧴", items: [
-    { name: "Toothbrushes & toothpaste (family)" },
-    { name: "Biodegradable soap" },
+  { cat: "Hygiene", icon: "🧴", items: [
+    { name: "Toothbrushes + toothpaste (family)" },
+    { name: "Soap (biodegradable)" },
     { name: "Towels — quick-dry (2 adult, 2 kid)" },
     { name: "Washcloths" },
     { name: "Baby shampoo / wash", tags: ["baby"] },
     { name: "Deodorant" },
     { name: "Toilet paper" },
-    { name: "Trowel", note: "if dispersed camping / backup" },
   ]},
   { cat: "Car & Misc", icon: "🚗", items: [
     { name: "Car seats properly installed", tags: ["toddler", "baby"] },
     { name: "Window shades for car", tags: ["toddler", "baby"] },
-    { name: "Stroller", tags: ["baby"] },
-    { name: "Phone chargers & battery pack" },
-    { name: "Camera" },
-    { name: "Campsite reservation printout", note: "cell service is limited at Henry Coe" },
-    { name: "Cash (for day-use / extra fees)" },
-    { name: "Map of Henry Coe", note: "download offline — no cell service" },
-    { name: "Emergency contact list — printed" },
+    { name: "Kindle" },
+    { name: "Phone, keys, charger, wallet" },
+    { name: "Battery pack" },
+    { name: "Campsite reservation printout", note: "no cell service" },
+    { name: "Offline map of Henry Coe" },
     { name: "Extra plastic bags / wet bags" },
   ]},
 ];
 
-const STORAGE_KEY = "henrycoe-camping-2026";
+const STORAGE_KEY = "henrycoe-camping-2026-v2";
 
 function loadState() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
@@ -334,21 +420,31 @@ function loadState() {
 }
 function saveState(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
 
+function loadData() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORAGE_KEY + "-data"));
+    if (d && d.length) return d;
+  } catch {}
+  return JSON.parse(JSON.stringify(DEFAULT_DATA));
+}
+function saveData(d) { localStorage.setItem(STORAGE_KEY + "-data", JSON.stringify(d)); }
+
 let state = loadState();
+let data = loadData();
+let editMode = false;
 
 function render() {
   const main = document.getElementById("list");
   main.innerHTML = "";
   let total = 0, checked = 0;
 
-  DATA.forEach((cat, ci) => {
+  const tagLabel = { toddler: "3.5y", baby: "15mo", hot: "hot tip", prep: "prep?" };
+  const tagClass = { toddler: "tag-toddler", baby: "tag-baby", hot: "tag-hot", prep: "tag-prep" };
+
+  data.forEach((cat, ci) => {
     const collapsed = state[`cat_${ci}_collapsed`];
     const div = document.createElement("div");
-    div.className = "category" + (collapsed ? " collapsed" : "");
-
-    const tagMap = { toddler: "toddler", baby: "baby", hot: "hot" };
-    const tagLabel = { toddler: "3.5y", baby: "15mo", hot: "hot tip" };
-    const tagClass = { toddler: "tag-toddler", baby: "tag-baby", hot: "tag-hot" };
+    div.className = "category" + (collapsed ? " collapsed" : "") + (editMode ? " editing" : "");
 
     let catChecked = 0;
     const itemsHtml = cat.items.map((item, ii) => {
@@ -357,21 +453,30 @@ function render() {
       if (isChecked) { catChecked++; checked++; }
       total++;
       const tags = (item.tags || []).map(t =>
-        `<span class="tag ${tagClass[t]}">${tagLabel[t]}</span>`
+        `<span class="tag ${tagClass[t] || ""}">${tagLabel[t] || t}</span>`
       ).join("");
       const note = item.note ? `<span class="note">${item.note}</span>` : "";
+      const editCtrl = `<span class="edit-controls">
+        <button class="del" onclick="deleteItem(${ci},${ii})" title="Delete">&times;</button>
+      </span>`;
       return `<div class="item ${isChecked ? "checked" : ""}">
         <input type="checkbox" id="${key}" ${isChecked ? "checked" : ""} onchange="toggle('${key}')">
         <label for="${key}">${item.name}${tags}${note}</label>
+        ${editCtrl}
       </div>`;
     }).join("");
+
+    const addRow = `<div class="add-item">
+      <input type="text" placeholder="Add item…" onkeydown="if(event.key==='Enter')addItem(${ci},this)">
+      <button onclick="addItem(${ci},this.previousElementSibling)">Add</button>
+    </div>`;
 
     div.innerHTML = `
       <div class="category-header" onclick="toggleCat(${ci})">
         <h2>${cat.icon} ${cat.cat} <span class="count">${catChecked}/${cat.items.length}</span></h2>
         <span class="chevron">&#9660;</span>
       </div>
-      <div class="category-items">${itemsHtml}</div>
+      <div class="category-items">${itemsHtml}${addRow}</div>
     `;
     main.appendChild(div);
   });
@@ -395,19 +500,56 @@ function toggleCat(ci) {
 }
 
 function expandAll() {
-  DATA.forEach((_, ci) => { state[`cat_${ci}_collapsed`] = false; });
+  data.forEach((_, ci) => { state[`cat_${ci}_collapsed`] = false; });
   saveState(state);
   render();
 }
 function collapseAll() {
-  DATA.forEach((_, ci) => { state[`cat_${ci}_collapsed`] = true; });
+  data.forEach((_, ci) => { state[`cat_${ci}_collapsed`] = true; });
   saveState(state);
   render();
 }
 function resetAll() {
   if (!confirm("Uncheck all items?")) return;
-  state = {};
+  const collapsed = {};
+  Object.keys(state).forEach(k => { if (k.startsWith("cat_")) collapsed[k] = state[k]; });
+  state = collapsed;
   saveState(state);
+  render();
+}
+
+function toggleEditMode() {
+  editMode = !editMode;
+  const btn = document.getElementById("editBtn");
+  btn.textContent = editMode ? "Done Editing" : "Edit List";
+  btn.className = editMode ? "active" : "";
+  render();
+}
+
+function deleteItem(ci, ii) {
+  data[ci].items.splice(ii, 1);
+  saveData(data);
+  const newState = {};
+  Object.keys(state).forEach(k => {
+    if (k.startsWith("cat_")) { newState[k] = state[k]; return; }
+    const m = k.match(/^item_(\d+)_(\d+)$/);
+    if (!m) return;
+    const c = parseInt(m[1]), i = parseInt(m[2]);
+    if (c === ci && i === ii) return;
+    if (c === ci && i > ii) { newState[`item_${c}_${i-1}`] = state[k]; }
+    else { newState[k] = state[k]; }
+  });
+  state = newState;
+  saveState(state);
+  render();
+}
+
+function addItem(ci, input) {
+  const name = input.value.trim();
+  if (!name) return;
+  data[ci].items.push({ name });
+  saveData(data);
+  input.value = "";
   render();
 }
 
