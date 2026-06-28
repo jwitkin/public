@@ -78,12 +78,37 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
   }
   .category-header .count {
     font-size: 0.8rem;
     color: var(--gray);
     font-weight: normal;
   }
+  .category-header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+    flex-shrink: 0;
+  }
+  .edit-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+    padding: 4px 6px;
+    border-radius: 4px;
+    color: var(--gray);
+    line-height: 1;
+    min-width: 36px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .edit-toggle:hover { background: #f3f4f6; }
+  .category.editing .edit-toggle { color: var(--green); }
   .chevron {
     transition: transform 0.2s;
     color: var(--gray);
@@ -459,7 +484,7 @@ const LS_DATA = "packing-" + LIST_ID + "-data";
 
 let state = {};
 let data = JSON.parse(JSON.stringify(DEFAULT_DATA));
-let editMode = false;
+let editingCats = new Set();
 let syncReady = false;
 let writeTimer = null;
 let pollTimer = null;
@@ -579,7 +604,7 @@ function render() {
   data.forEach((cat, ci) => {
     const collapsed = state["cat_" + ci + "_collapsed"];
     const div = document.createElement("div");
-    div.className = "category" + (collapsed ? " collapsed" : "") + (editMode ? " editing" : "");
+    div.className = "category" + (collapsed ? " collapsed" : "") + (editingCats.has(ci) ? " editing" : "");
 
     let catChecked = 0;
     const itemsHtml = cat.items.map((item, ii) => {
@@ -609,7 +634,10 @@ function render() {
     div.innerHTML =
       '<div class="category-header" onclick="toggleCat(' + ci + ')">' +
         '<h2>' + cat.icon + ' ' + cat.cat + ' <span class="count">' + catChecked + '/' + cat.items.length + '</span></h2>' +
-        '<span class="chevron">&#9660;</span>' +
+        '<span class="category-header-right">' +
+          '<button class="edit-toggle" onclick="event.stopPropagation(); toggleCatEdit(' + ci + ')" title="Edit this section">&#9998;&#65039;</button>' +
+          '<span class="chevron">&#9660;</span>' +
+        '</span>' +
       '</div>' +
       '<div class="category-items">' + itemsHtml + addRow + '</div>';
     main.appendChild(div);
@@ -618,6 +646,7 @@ function render() {
   const pct = total ? Math.round(checked / total * 100) : 0;
   document.getElementById("progressFill").style.width = pct + "%";
   document.getElementById("progressText").textContent = checked + " / " + total + " packed (" + pct + "%)";
+  updateEditBtn();
 }
 
 function toggle(key) {
@@ -657,11 +686,29 @@ function resetAll() {
   render();
 }
 
-function toggleEditMode() {
-  editMode = !editMode;
+function allEditing() {
+  return data.length > 0 && data.every((_, ci) => editingCats.has(ci));
+}
+
+function updateEditBtn() {
   const btn = document.getElementById("editBtn");
-  btn.textContent = editMode ? "Done Editing" : "Edit List";
-  btn.className = editMode ? "active" : "";
+  const editing = allEditing();
+  btn.textContent = editing ? "Done Editing" : "Edit List";
+  btn.className = editing ? "active" : "";
+}
+
+function toggleEditMode() {
+  if (allEditing()) {
+    editingCats.clear();
+  } else {
+    data.forEach((_, ci) => editingCats.add(ci));
+  }
+  render();
+}
+
+function toggleCatEdit(ci) {
+  if (editingCats.has(ci)) editingCats.delete(ci);
+  else editingCats.add(ci);
   render();
 }
 
