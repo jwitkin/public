@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Camping Packing List — Henry Coe, July 2026</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   :root {
     --green: #2d6a4f;
@@ -704,7 +703,12 @@ function showToast(msg) {
 
 loadLocal();
 render();
-initSync();
+
+const script = document.createElement("script");
+script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
+script.onload = () => initSync();
+script.onerror = () => setSyncStatus("Offline — local only", "offline");
+document.head.appendChild(script);
 </script>
 </body>
 </html>
