@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camping Packing List — Henry Coe, July 2026</title>
+<style>
+  :root {
+    --green: #2d6a4f;
+    --green-light: #d8f3dc;
+    --green-bg: #f0faf3;
+    --orange: #e76f51;
+    --sand: #fefae0;
+    --gray: #6b7280;
+    --border: #e5e7eb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--green-bg);
+    color: #1a1a1a;
+    line-height: 1.5;
+    padding: 1rem;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  header {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    margin-bottom: 1rem;
+  }
+  header h1 {
+    font-size: 1.6rem;
+    color: var(--green);
+  }
+  header p {
+    color: var(--gray);
+    font-size: 0.9rem;
+    margin-top: 0.25rem;
+  }
+  .progress-bar {
+    background: var(--border);
+    border-radius: 999px;
+    height: 10px;
+    margin: 1rem 0;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    background: var(--green);
+    height: 100%;
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 999px;
+  }
+  .progress-text {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--gray);
+  }
+  .category {
+    background: #fff;
+    border-radius: 12px;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .category-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    user-select: none;
+    background: #fff;
+    border: none;
+    width: 100%;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+  }
+  .category-header:hover { background: #fafafa; }
+  .category-header h2 {
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .category-header .count {
+    font-size: 0.8rem;
+    color: var(--gray);
+    font-weight: normal;
+  }
+  .chevron {
+    transition: transform 0.2s;
+    color: var(--gray);
+    font-size: 0.8rem;
+  }
+  .category.collapsed .chevron { transform: rotate(-90deg); }
+  .category.collapsed .category-items { display: none; }
+  .category-items { padding: 0 0.5rem 0.5rem; }
+  .item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: 6px;
+  }
+  .item:hover { background: #f9fafb; }
+  .item input[type="checkbox"] {
+    margin-top: 3px;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--green);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .item label {
+    cursor: pointer;
+    flex: 1;
+  }
+  .item.checked label {
+    text-decoration: line-through;
+    color: var(--gray);
+  }
+  .item .note {
+    font-size: 0.8rem;
+    color: var(--gray);
+    display: block;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+  .tag-toddler { background: #dbeafe; color: #1e40af; }
+  .tag-baby { background: #fce7f3; color: #9d174d; }
+  .tag-hot { background: #fef3c7; color: #92400e; }
+
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin: 1.5rem 0;
+    flex-wrap: wrap;
+  }
+  .actions button {
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #374151;
+  }
+  .actions button:hover { background: #f3f4f6; }
+  .actions button.danger { color: var(--orange); }
+
+  footer {
+    text-align: center;
+    padding: 1rem;
+    font-size: 0.8rem;
+    color: var(--gray);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Henry Coe Camping Trip</h1>
+  <p>2 nights &middot; July 2026 &middot; with kids (3.5y &amp; 15mo)</p>
+  <div class="progress-bar"><div class="progress-bar-fill" id="progressFill"></div></div>
+  <div class="progress-text" id="progressText">0 / 0 packed</div>
+</header>
+
+<main id="list"></main>
+
+<div class="actions">
+  <button onclick="expandAll()">Expand All</button>
+  <button onclick="collapseAll()">Collapse All</button>
+  <button class="danger" onclick="resetAll()">Reset All</button>
+</div>
+
+<footer>Check items as you pack. Progress saves in your browser.</footer>
+
+<script>
+const DATA = [
+  { cat: "Shelter & Sleep", icon: "⛺", items: [
+    { name: "Tent + footprint", note: "set up in yard night before to check" },
+    { name: "Sleeping bags x2 (adult)" },
+    { name: "Toddler sleeping bag or blanket", tags: ["toddler"] },
+    { name: "Baby sleep sack", tags: ["baby"] },
+    { name: "Sleeping pads x2" },
+    { name: "Pillows" },
+    { name: "Pack-n-Play or travel crib", tags: ["baby"], note: "for 15mo to sleep in tent" },
+    { name: "Fitted crib sheet", tags: ["baby"] },
+    { name: "Extra blankets (gets cold at night)", note: "Henry Coe nights can drop to 50s" },
+  ]},
+  { cat: "Clothing — Adults", icon: "👕", items: [
+    { name: "T-shirts / tanks (3 each)" },
+    { name: "Shorts (2 each)" },
+    { name: "Long pants (1 each)", note: "for evening / brush" },
+    { name: "Warm layer — fleece or hoodie (1 each)" },
+    { name: "Underwear & socks (3 each)" },
+    { name: "Sleepwear" },
+    { name: "Sturdy shoes / hiking boots" },
+    { name: "Sandals / camp shoes" },
+    { name: "Sun hats" },
+    { name: "Swimsuit", note: "if visiting swimming holes" },
+  ]},
+  { cat: "Clothing — Kids", icon: "🧒", items: [
+    { name: "T-shirts (4 each)", tags: ["toddler", "baby"], note: "extras for mess" },
+    { name: "Shorts / pants (3 each)", tags: ["toddler", "baby"] },
+    { name: "Long sleeves (2 each)", tags: ["toddler", "baby"] },
+    { name: "Warm jacket / fleece (1 each)", tags: ["toddler", "baby"] },
+    { name: "Pajamas (2 sets each)", tags: ["toddler", "baby"] },
+    { name: "Socks (4 pairs each)", tags: ["toddler", "baby"] },
+    { name: "Shoes — closed-toe", tags: ["toddler"] },
+    { name: "Shoes / soft-sole boots", tags: ["baby"] },
+    { name: "Sun hats", tags: ["toddler", "baby"] },
+    { name: "Swim diapers", tags: ["baby"] },
+  ]},
+  { cat: "Diapers & Potty", icon: "🚼", items: [
+    { name: "Diapers — pack 12/day for 15mo", tags: ["baby"], note: "~36 total" },
+    { name: "Pull-ups or diapers for 3.5yo if needed", tags: ["toddler"], note: "nighttime?" },
+    { name: "Wipes (2 packs)" },
+    { name: "Diaper cream" },
+    { name: "Portable changing pad" },
+    { name: "Trash bags for dirty diapers" },
+    { name: "Travel potty seat or portable potty", tags: ["toddler"] },
+  ]},
+  { cat: "Feeding — Baby & Toddler", icon: "🍼", items: [
+    { name: "Bottles / sippy cups", tags: ["baby"] },
+    { name: "Formula or milk + cooler", tags: ["baby"], note: "if applicable" },
+    { name: "Baby food / pouches", tags: ["baby"] },
+    { name: "Toddler snacks — crackers, fruit, bars", tags: ["toddler"] },
+    { name: "Bibs (3+)", tags: ["baby"] },
+    { name: "Spoons / toddler utensils", tags: ["toddler", "baby"] },
+    { name: "Plates / bowls — kid-size", tags: ["toddler", "baby"] },
+    { name: "High chair clip-on or booster", tags: ["baby"], note: "if picnic tables at site" },
+    { name: "Toddler water bottle", tags: ["toddler"] },
+  ]},
+  { cat: "Kitchen & Food — Adults", icon: "🍳", items: [
+    { name: "Camp stove + fuel" },
+    { name: "Lighter / matches" },
+    { name: "Cooler + ice" },
+    { name: "Water jugs (5 gal)", note: "no potable water at Henry Coe car camp" },
+    { name: "Pots & pan" },
+    { name: "Cooking utensils — spatula, tongs, knife" },
+    { name: "Cutting board" },
+    { name: "Plates, bowls, cups, utensils (adult)" },
+    { name: "Coffee setup", note: "French press / pour over / instant" },
+    { name: "Mugs" },
+    { name: "Dish soap, sponge, basin" },
+    { name: "Paper towels" },
+    { name: "Aluminum foil & zip-lock bags" },
+    { name: "Trash bags" },
+    { name: "Food — plan meals: 2 breakfasts, 2 lunches, 2 dinners, snacks" },
+    { name: "Bear canister or bear box check", note: "required in some Henry Coe areas" },
+  ]},
+  { cat: "Safety & Health", icon: "🩹", items: [
+    { name: "Sunscreen — adult & baby/kid-safe", tags: ["hot"] },
+    { name: "Insect repellent — kid-safe" },
+    { name: "First aid kit" },
+    { name: "Children's Tylenol / Motrin", tags: ["toddler", "baby"] },
+    { name: "Thermometer" },
+    { name: "Antihistamine (Benadryl) — kid-dose", tags: ["toddler", "baby"] },
+    { name: "Hydrocortisone cream" },
+    { name: "Band-aids & gauze" },
+    { name: "Tweezers (ticks & splinters)", note: "Henry Coe is tick country!" },
+    { name: "Tick removal tool", tags: ["hot"], note: "bring a tick key" },
+    { name: "Hand sanitizer" },
+    { name: "Any prescription meds" },
+  ]},
+  { cat: "Gear & Tools", icon: "🔦", items: [
+    { name: "Headlamps / flashlights + batteries" },
+    { name: "Camp chairs (2 adult)" },
+    { name: "Small kid chair or blanket to sit on", tags: ["toddler"] },
+    { name: "Table cloth or cover for picnic table" },
+    { name: "Tarp for shade", tags: ["hot"], note: "Henry Coe gets HOT — plan shade" },
+    { name: "Canopy / pop-up shade", tags: ["hot"] },
+    { name: "Multi-tool / knife" },
+    { name: "Duct tape" },
+    { name: "Rope / paracord" },
+    { name: "Firewood / fire starters", note: "check if fires allowed — summer fire ban?" },
+    { name: "Marshmallow roasting sticks" },
+  ]},
+  { cat: "Kids Entertainment & Comfort", icon: "🧸", items: [
+    { name: "Favorite stuffed animal / lovey", tags: ["toddler", "baby"] },
+    { name: "Books (2-3)", tags: ["toddler"] },
+    { name: "Bubbles", tags: ["toddler"] },
+    { name: "Sand/dirt toys — bucket, shovel", tags: ["toddler"] },
+    { name: "Ball", tags: ["toddler"] },
+    { name: "Stroller — jogging or all-terrain", tags: ["baby"] },
+    { name: "Baby carrier (structured)", tags: ["baby"], note: "for trails" },
+    { name: "Pacifiers (if used)", tags: ["baby"] },
+    { name: "White noise machine", tags: ["baby"], note: "battery-powered" },
+    { name: "Glow sticks — fun & helps locate kids at dusk", tags: ["toddler"] },
+  ]},
+  { cat: "Hygiene & Bath", icon: "🧴", items: [
+    { name: "Toothbrushes & toothpaste (family)" },
+    { name: "Biodegradable soap" },
+    { name: "Towels — quick-dry (2 adult, 2 kid)" },
+    { name: "Washcloths" },
+    { name: "Baby shampoo / wash", tags: ["baby"] },
+    { name: "Deodorant" },
+    { name: "Toilet paper" },
+    { name: "Trowel", note: "if dispersed camping / backup" },
+  ]},
+  { cat: "Car & Misc", icon: "🚗", items: [
+    { name: "Car seats properly installed", tags: ["toddler", "baby"] },
+    { name: "Window shades for car", tags: ["toddler", "baby"] },
+    { name: "Stroller", tags: ["baby"] },
+    { name: "Phone chargers & battery pack" },
+    { name: "Camera" },
+    { name: "Campsite reservation printout", note: "cell service is limited at Henry Coe" },
+    { name: "Cash (for day-use / extra fees)" },
+    { name: "Map of Henry Coe", note: "download offline — no cell service" },
+    { name: "Emergency contact list — printed" },
+    { name: "Extra plastic bags / wet bags" },
+  ]},
+];
+
+const STORAGE_KEY = "henrycoe-camping-2026";
+
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveState(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+
+let state = loadState();
+
+function render() {
+  const main = document.getElementById("list");
+  main.innerHTML = "";
+  let total = 0, checked = 0;
+
+  DATA.forEach((cat, ci) => {
+    const collapsed = state[`cat_${ci}_collapsed`];
+    const div = document.createElement("div");
+    div.className = "category" + (collapsed ? " collapsed" : "");
+
+    const tagMap = { toddler: "toddler", baby: "baby", hot: "hot" };
+    const tagLabel = { toddler: "3.5y", baby: "15mo", hot: "hot tip" };
+    const tagClass = { toddler: "tag-toddler", baby: "tag-baby", hot: "tag-hot" };
+
+    let catChecked = 0;
+    const itemsHtml = cat.items.map((item, ii) => {
+      const key = `item_${ci}_${ii}`;
+      const isChecked = !!state[key];
+      if (isChecked) { catChecked++; checked++; }
+      total++;
+      const tags = (item.tags || []).map(t =>
+        `<span class="tag ${tagClass[t]}">${tagLabel[t]}</span>`
+      ).join("");
+      const note = item.note ? `<span class="note">${item.note}</span>` : "";
+      return `<div class="item ${isChecked ? "checked" : ""}">
+        <input type="checkbox" id="${key}" ${isChecked ? "checked" : ""} onchange="toggle('${key}')">
+        <label for="${key}">${item.name}${tags}${note}</label>
+      </div>`;
+    }).join("");
+
+    div.innerHTML = `
+      <div class="category-header" onclick="toggleCat(${ci})">
+        <h2>${cat.icon} ${cat.cat} <span class="count">${catChecked}/${cat.items.length}</span></h2>
+        <span class="chevron">&#9660;</span>
+      </div>
+      <div class="category-items">${itemsHtml}</div>
+    `;
+    main.appendChild(div);
+  });
+
+  const pct = total ? Math.round(checked / total * 100) : 0;
+  document.getElementById("progressFill").style.width = pct + "%";
+  document.getElementById("progressText").textContent = `${checked} / ${total} packed (${pct}%)`;
+}
+
+function toggle(key) {
+  state[key] = !state[key];
+  saveState(state);
+  render();
+}
+
+function toggleCat(ci) {
+  const key = `cat_${ci}_collapsed`;
+  state[key] = !state[key];
+  saveState(state);
+  render();
+}
+
+function expandAll() {
+  DATA.forEach((_, ci) => { state[`cat_${ci}_collapsed`] = false; });
+  saveState(state);
+  render();
+}
+function collapseAll() {
+  DATA.forEach((_, ci) => { state[`cat_${ci}_collapsed`] = true; });
+  saveState(state);
+  render();
+}
+function resetAll() {
+  if (!confirm("Uncheck all items?")) return;
+  state = {};
+  saveState(state);
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
